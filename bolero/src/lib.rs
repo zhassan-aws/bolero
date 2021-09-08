@@ -14,6 +14,9 @@ cfg_if::cfg_if! {
     } else if #[cfg(fuzzing_honggfuzz)] {
         /// The default engine used when defining a test target
         pub use bolero_honggfuzz::HonggfuzzEngine as DefaultEngine;
+    } else if #[cfg(fuzzing_rmc)] {
+        /// The default engine used when defining a test target
+        pub use bolero_rmc::RmcEngine as DefaultEngine;
     } else {
         mod test;
 
@@ -472,12 +475,9 @@ fn range_generator_test() {
 
 #[test]
 fn range_generator_cloned_test() {
-    check!()
-        .with_generator(0..=5)
-        .cloned()
-        .for_each(|_input: u8| {
-            // println!("{:?}", input);
-        });
+    check!().with_generator(0..=5).cloned().for_each(|_input: u8| {
+        // println!("{:?}", input);
+    });
 }
 
 #[cfg(test)]
