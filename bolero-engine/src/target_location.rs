@@ -28,6 +28,10 @@ pub struct TargetLocation {
 
 impl TargetLocation {
     pub fn should_run(&self) -> bool {
+        if cfg!(fuzzing_rmc) {
+            return true;
+        }
+
         // cargo-bolero needs to resolve information about the target
         if let Ok(mode) = ::std::env::var("CARGO_BOLERO_SELECT") {
             match mode.as_str() {
@@ -50,9 +54,7 @@ impl TargetLocation {
         println!(
             r#"
 {{"__bolero_target":"v0.5.0","exe":{:?},"work_dir":{:?},"package_name":{:?},"is_harnessed":{:?},"test_name":{:?}}}"#,
-            ::std::env::current_exe()
-                .expect("valid current_exe")
-                .display(),
+            ::std::env::current_exe().expect("valid current_exe").display(),
             self.work_dir().expect("valid work_dir").display(),
             &self.package_name,
             self.is_harnessed(),
@@ -61,6 +63,10 @@ impl TargetLocation {
     }
 
     pub fn abs_path(&self) -> Option<PathBuf> {
+        if cfg!(fuzzing_rmc) {
+            return None;
+        }
+
         let file = Path::new(self.file);
 
         #[cfg(not(miri))] // miri does not currently support this call
@@ -70,19 +76,17 @@ impl TargetLocation {
             }
         }
 
-        Path::new(self.manifest_dir)
-            .ancestors()
-            .find_map(|ancestor| {
-                let path = ancestor.join(file);
-                if path.exists() {
-                    Some(path)
-                } else {
-                    None
-                }
-            })
+        Path::new(self.manifest_dir).ancestors().find_map(|ancestor| {
+            let path = ancestor.join(file);
+            if path.exists() { Some(path) } else { None }
+        })
     }
 
     pub fn work_dir(&self) -> Option<PathBuf> {
+        if cfg!(fuzzing_rmc) {
+            return None;
+        }
+
         let mut work_dir = self.abs_path()?;
         work_dir.pop();
 
@@ -101,6 +105,10 @@ impl TargetLocation {
     }
 
     pub fn is_harnessed(&self) -> bool {
+        if cfg!(fuzzing_rmc) {
+            return false;
+        }
+
         is_harnessed(self.item_path)
     }
 
@@ -130,11 +138,7 @@ impl TargetLocation {
 
 fn is_harnessed(name: &str) -> bool {
     // only harnessed tests spawn threads
-    if std::thread::current()
-        .name()
-        .filter(|name| name != &"main")
-        .is_some()
-    {
+    if std::thread::current().name().filter(|name| name != &"main").is_some() {
         return true;
     }
 
@@ -184,27 +188,14 @@ fn format_symbol_name(name: &str) -> String {
         _ => {}
     }
 
-    if parts.len() == 1 {
-        parts.pop().unwrap().to_string()
-    } else {
-        parts[1..].join("::")
-    }
+    if parts.len() == 1 { parts.pop().unwrap().to_string() } else { parts[1..].join("::") }
 }
 
 #[test]
 fn format_symbol_name_test() {
-    assert_eq!(
-        format_symbol_name("crate::main::__bolero_item_path__::123"),
-        "crate"
-    );
-    assert_eq!(
-        format_symbol_name("crate::test::__bolero_item_path__::123"),
-        "test"
-    );
-    assert_eq!(
-        format_symbol_name("crate::test::{{closure}}::__bolero_item_path__::123"),
-        "test"
-    );
+    assert_eq!(format_symbol_name("crate::main::__bolero_item_path__::123"), "crate");
+    assert_eq!(format_symbol_name("crate::test::__bolero_item_path__::123"), "test");
+    assert_eq!(format_symbol_name("crate::test::{{closure}}::__bolero_item_path__::123"), "test");
     assert_eq!(
         format_symbol_name("crate::nested::test::__bolero_item_path__::123"),
         "nested::test"

@@ -11,7 +11,7 @@ use std::{
 
 macro_rules! backtrace {
     () => {{
-        if CAPTURE_BACKTRACE.with(|capture| *capture.borrow()) {
+        if cfg!(not(fuzzing_rmc)) && CAPTURE_BACKTRACE.with(|capture| *capture.borrow()) {
             Some(mini_backtrace())
         } else {
             None
@@ -23,15 +23,21 @@ thread_local! {
     static ERROR: RefCell<Option<PanicError>> = RefCell::new(None);
     static CAPTURE_BACKTRACE: RefCell<bool> = RefCell::new(*RUST_BACKTRACE);
     static FORWARD_PANIC: RefCell<bool> = RefCell::new(true);
-    static THREAD_NAME: String = String::from(std::thread::current().name().unwrap_or("main"));
+    static THREAD_NAME: String = if cfg!(fuzzing_rmc) {
+        String::from(std::thread::current().name().unwrap_or("main"))
+    } else {
+        "main".to_string()
+    };
 }
 
 lazy_static! {
-    static ref RUST_BACKTRACE: bool = std::env::var("RUST_BACKTRACE")
-        .ok()
-        .map(|v| v == "1")
-        .unwrap_or(false);
+    static ref RUST_BACKTRACE: bool = cfg!(not(fuzzing_rmc))
+        && std::env::var("RUST_BACKTRACE").ok().map(|v| v == "1").unwrap_or(false);
     static ref PANIC_HOOK: () = {
+        if cfg!(fuzzing_rmc) {
+            return;
+        }
+
         let prev_hook = std::panic::take_hook();
 
         std::panic::set_hook(Box::new(move |reason| {
@@ -73,17 +79,16 @@ impl Display for PanicError {
 
 impl PanicError {
     pub(crate) fn new(message: String) -> Self {
-        Self {
-            message,
-            location: None,
-            backtrace: backtrace!(),
-            thread_name: thread_name(),
-        }
+        Self { message, location: None, backtrace: backtrace!(), thread_name: thread_name() }
     }
 }
 
 pub fn catch<F: RefUnwindSafe + FnOnce() -> Output, Output>(fun: F) -> Result<Output, PanicError> {
     catch_unwind(AssertUnwindSafe(|| __panic_marker_start__(fun))).map_err(|err| {
+        if cfg!(fuzzing_rmc) {
+            return PanicError::new("test failed".to_string());
+        }
+
         if let Some(err) = take_panic() {
             return err;
         }
@@ -109,6 +114,10 @@ pub fn take_panic() -> Option<PanicError> {
 }
 
 pub fn capture_backtrace(value: bool) -> bool {
+    if cfg!(fuzzing_rmc) {
+        return false;
+    }
+
     CAPTURE_BACKTRACE.with(|cell| {
         let prev = *cell.borrow();
         *cell.borrow_mut() = value;
@@ -117,6 +126,10 @@ pub fn capture_backtrace(value: bool) -> bool {
 }
 
 pub fn forward_panic(value: bool) -> bool {
+    if cfg!(fuzzing_rmc) {
+        return false;
+    }
+
     FORWARD_PANIC.with(|cell| {
         let prev = *cell.borrow();
         *cell.borrow_mut() = value;
@@ -133,6 +146,10 @@ pub fn rust_backtrace() -> bool {
 }
 
 pub fn thread_name() -> String {
+    if cfg!(fuzzing_rmc) {
+        return "main".to_string();
+    }
+
     THREAD_NAME.with(|cell| cell.clone())
 }
 
@@ -154,10 +171,8 @@ fn mini_backtrace() -> Backtrace {
         let mut is_done = false;
 
         backtrace::resolve_frame(frame, |symbol| {
-            let is_this_crate = symbol
-                .filename()
-                .map(|path| path.starts_with(parent))
-                .unwrap_or(false);
+            let is_this_crate =
+                symbol.filename().map(|path| path.starts_with(parent)).unwrap_or(false);
 
             match state {
                 State::Backtrace => {

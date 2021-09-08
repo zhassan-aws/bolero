@@ -120,7 +120,7 @@ macro_rules! check {
             test_name: None,
         };
 
-        if !location.should_run() {
+        if !(cfg!(not(fuzzing_cbmc)) && location.should_run()) {
             return;
         }
 
@@ -146,7 +146,7 @@ macro_rules! check {
             test_name: Some(format!("{}", $target_name)),
         };
 
-        if !location.should_run() {
+        if !(cfg!(not(fuzzing_cbmc)) && location.should_run()) {
             return;
         }
 

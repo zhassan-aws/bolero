@@ -32,8 +32,14 @@ pub mod lib {
 
         fn run(self, mut test: T) -> Self::Output {
             let mut input = RmcInput;
-            let was_valid = test.test(&mut input).expect("test should pass");
-            __VERIFIER_assume(was_valid);
+            match test.test(&mut input) {
+                Ok(was_valid) => {
+                    __VERIFIER_assume(was_valid);
+                }
+                Err(_) => {
+                    panic!("test failed");
+                }
+            }
         }
     }
 
