@@ -120,7 +120,7 @@ macro_rules! check {
             test_name: None,
         };
 
-        if !(cfg!(not(fuzzing_cbmc)) && location.should_run()) {
+        if !location.should_run() {
             return;
         }
 
@@ -146,7 +146,7 @@ macro_rules! check {
             test_name: Some(format!("{}", $target_name)),
         };
 
-        if !(cfg!(not(fuzzing_cbmc)) && location.should_run()) {
+        if !location.should_run() {
             return;
         }
 
@@ -475,9 +475,12 @@ fn range_generator_test() {
 
 #[test]
 fn range_generator_cloned_test() {
-    check!().with_generator(0..=5).cloned().for_each(|_input: u8| {
-        // println!("{:?}", input);
-    });
+    check!()
+        .with_generator(0..=5)
+        .cloned()
+        .for_each(|_input: u8| {
+            // println!("{:?}", input);
+        });
 }
 
 #[cfg(test)]

@@ -2,10 +2,10 @@
 name = "bolero-rmc"
 version = "0.6.0"
 authors = ["Cameron Bytheway <bytheway.cameron@gmail.com>"]
-description = "libfuzzer plugin for bolero"
+description = "rmc plugin for bolero"
 homepage = "https://github.com/camshaft/bolero"
 repository = "https://github.com/camshaft/bolero"
-keywords = ["testing", "fuzz", "fuzzing"]
+keywords = ["testing", "model", "proof"]
 license = "MIT"
 edition = "2018"
 readme = "../README.md"

@@ -24,9 +24,9 @@ thread_local! {
     static CAPTURE_BACKTRACE: RefCell<bool> = RefCell::new(*RUST_BACKTRACE);
     static FORWARD_PANIC: RefCell<bool> = RefCell::new(true);
     static THREAD_NAME: String = if cfg!(fuzzing_rmc) {
-        String::from(std::thread::current().name().unwrap_or("main"))
-    } else {
         "main".to_string()
+    } else {
+        String::from(std::thread::current().name().unwrap_or("main"))
     };
 }
 
@@ -34,6 +34,7 @@ lazy_static! {
     static ref RUST_BACKTRACE: bool = cfg!(not(fuzzing_rmc))
         && std::env::var("RUST_BACKTRACE").ok().map(|v| v == "1").unwrap_or(false);
     static ref PANIC_HOOK: () = {
+        // rmc doesn't need panic handling
         if cfg!(fuzzing_rmc) {
             return;
         }
@@ -79,16 +80,22 @@ impl Display for PanicError {
 
 impl PanicError {
     pub(crate) fn new(message: String) -> Self {
-        Self { message, location: None, backtrace: backtrace!(), thread_name: thread_name() }
+        Self {
+            message,
+            location: None,
+            backtrace: backtrace!(),
+            thread_name: thread_name(),
+        }
     }
 }
 
 pub fn catch<F: RefUnwindSafe + FnOnce() -> Output, Output>(fun: F) -> Result<Output, PanicError> {
-    catch_unwind(AssertUnwindSafe(|| __panic_marker_start__(fun))).map_err(|err| {
-        if cfg!(fuzzing_rmc) {
-            return PanicError::new("test failed".to_string());
-        }
+    // don't catch panics with rmc
+    if cfg!(fuzzing_rmc) {
+        return Ok(fun());
+    }
 
+    catch_unwind(AssertUnwindSafe(|| __panic_marker_start__(fun))).map_err(|err| {
         if let Some(err) = take_panic() {
             return err;
         }
@@ -171,8 +178,10 @@ fn mini_backtrace() -> Backtrace {
         let mut is_done = false;
 
         backtrace::resolve_frame(frame, |symbol| {
-            let is_this_crate =
-                symbol.filename().map(|path| path.starts_with(parent)).unwrap_or(false);
+            let is_this_crate = symbol
+                .filename()
+                .map(|path| path.starts_with(parent))
+                .unwrap_or(false);
 
             match state {
                 State::Backtrace => {
