@@ -5,7 +5,12 @@ pub use bolero_generator::{
 };
 use core::time::Duration;
 
+#[cfg(not(rmc))]
 pub mod panic;
+#[cfg(rmc)]
+#[path = "./rmc/panic.rs"]
+pub mod panic;
+
 #[cfg(feature = "rng")]
 pub mod rng;
 pub mod shrink;

@@ -2,6 +2,8 @@
 //!
 //! This crate should not be used directly. Instead, use `bolero`.
 
+#![allow(unused_unsafe)] // nondet needs to be unsafe but it's currently not
+
 #[cfg(not(rmc))]
 #[allow(dead_code)]
 mod rmc {
@@ -10,14 +12,17 @@ mod rmc {
     }
 
     pub fn assume(cond: bool) {
-        assert!(cond)
+        // no-op
+        let _ = cond;
     }
 }
 
 #[doc(hidden)]
 #[cfg(any(test, all(feature = "lib", fuzzing_rmc), all(feature = "lib", rmc)))]
 pub mod lib {
+    #[allow(unused_imports)]
     use super::*;
+
     use bolero_engine::{
         Driver, DriverMode, Engine, TargetLocation, Test, TestInput, TypeGenerator,
     };
