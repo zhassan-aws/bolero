@@ -133,6 +133,7 @@ where
 }
 
 /// Lazily generates a new value for the given driver
+#[cfg(not(rmc))]
 macro_rules! generate_value {
     ($self:ident, $driver:ident) => {{
         let forward_panic = crate::panic::forward_panic(true);
@@ -154,6 +155,14 @@ macro_rules! generate_value {
         value
     }};
 }
+#[cfg(rmc)]
+macro_rules! generate_value {
+    ($self:ident, $driver:ident) => {{
+        $self.value = $self.gen.generate($driver);
+        rmc::assume($self.value.is_some());
+        $self.value.as_ref().unwrap()
+    }};
+}
 
 pub struct BorrowedGeneratorTest<F, G, V> {
     fun: F,
@@ -163,11 +172,7 @@ pub struct BorrowedGeneratorTest<F, G, V> {
 
 impl<F, G, V> BorrowedGeneratorTest<F, G, V> {
     pub fn new(fun: F, gen: G) -> Self {
-        Self {
-            fun,
-            gen,
-            value: None,
-        }
+        Self { fun, gen, value: None }
     }
 }
 
@@ -216,11 +221,7 @@ pub struct ClonedGeneratorTest<F, G, V> {
 
 impl<F, G, V> ClonedGeneratorTest<F, G, V> {
     pub fn new(fun: F, gen: G) -> Self {
-        Self {
-            fun,
-            gen,
-            value: None,
-        }
+        Self { fun, gen, value: None }
     }
 }
 
